@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Open Newtown Dolerw Park interactive location map">
+  <title>Dolerw Park Interactive Map</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="on-header">
+    <div class="on-header__inner">
+      <p class="on-header__eyebrow">Open Newtown</p>
+      <h1>Dolerw Park Interactive Map</h1>
+      <p>Explore the park, select a precise location and copy its coordinates.</p>
+      <span class="on-header__prototype">Prototype</span>
+    </div>
+  </header>
+
+  <main class="on-app" aria-labelledby="map-heading">
+    <h2 id="map-heading" class="on-visually-hidden">Interactive Dolerw Park map</h2>
+
+    <section class="on-map-card" aria-label="Map and geographic layer controls">
+      <div class="on-map-toolbar">
+        <div>
+          <label for="layer-select">Geographic layer</label>
+          <select id="layer-select" class="on-select">
+            <option value="dolerw">Dolerw boundary</option>
+          </select>
+        </div>
+        <button id="reset-view" class="on-button on-button--secondary" type="button">Reset map view</button>
+      </div>
+      <p class="on-map-instruction">Click inside the blue Dolerw Park boundary to select a location. Click another spot to move the marker.</p>
+      <div id="map" role="application" aria-label="Map of Dolerw Park"></div>
+      <p id="map-status" class="on-map-status" role="status" aria-live="polite">Loading geographic data...</p>
+    </section>
+
+    <aside class="on-info" aria-labelledby="location-heading">
+      <h2 id="location-heading">Selected location</h2>
+      <div id="selection-status" class="on-selection-status">
+        <span class="on-selection-status__dot" aria-hidden="true"></span>
+        <span>No location selected</span>
+      </div>
+
+      <dl class="on-coordinates">
+        <div>
+          <dt>Latitude</dt>
+          <dd id="latitude">--</dd>
+        </div>
+        <div>
+          <dt>Longitude</dt>
+          <dd id="longitude">--</dd>
+        </div>
+      </dl>
+
+      <section class="on-w3w" aria-labelledby="w3w-heading">
+        <h3 id="w3w-heading">what3words</h3>
+        <p id="w3w-address" class="on-w3w__address">what3words lookup not configured</p>
+        <p class="on-w3w__help">The official map does not resolve coordinates from its URL. This opens the map and copies the selected coordinates for its search field.</p>
+        <button id="find-on-w3w" class="on-button" type="button" disabled>
+          Find on what3words
+        </button>
+        <button id="copy-w3w" class="on-button on-button--secondary" type="button" disabled>
+          Copy what3words
+        </button>
+      </section>
+
+      <div class="on-actions">
+        <button id="copy-coordinates" class="on-button" type="button" disabled>Copy coordinates</button>
+        <button id="clear-selection" class="on-button on-button--secondary" type="button" disabled>Clear selection</button>
+      </div>
+    </aside>
+  </main>
+
+  <div id="toast" class="on-toast" role="status" aria-live="polite"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""></script>
+  <script type="module" src="script.js"></script>
+</body>
+</html>
