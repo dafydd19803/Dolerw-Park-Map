@@ -60,7 +60,7 @@ The grid-section and convert-to-3wa calls use the official what3words API throug
 The Cloudflare Pages Function is required for real what3words calls. Install Node.js, then create a `.dev.vars` file in the project root (this filename is ignored by Git):
 
 ```text
-W3W_API_KEY=your_what3words_api_key
+WHAT3WORDS_API_KEY=your_what3words_api_key
 ```
 
 Run the app and function locally with Wrangler:
@@ -74,8 +74,8 @@ Open `http://localhost:8788/`, zoom to 18 or higher, wait for the grid, then sel
 ## Cloudflare Pages setup
 
 1. Deploy this project folder as a Cloudflare Pages project using its Git integration or `npx wrangler pages deploy . --project-name=<project-name>`. Keep the `functions/` directory at the project root.
-2. In the Cloudflare dashboard, open the Pages project **Settings → Variables and Secrets** and add `W3W_API_KEY` as a **Secret** for Production. Add it separately for Preview if preview deployments need API access.
-3. Alternatively, add the secret with Wrangler: `npx wrangler pages secret put W3W_API_KEY --project-name=<project-name>`.
+2. In the Cloudflare dashboard, open the Pages project **Settings → Variables and Secrets** and add `WHAT3WORDS_API_KEY` as a **Secret** for Production. Add it separately for Preview if preview deployments need API access.
+3. Alternatively, add the secret with Wrangler: `npx wrangler pages secret put WHAT3WORDS_API_KEY --project-name=<project-name>`.
 4. Redeploy after setting or rotating the secret. The function returns an explicit configuration error if the secret is missing.
 
 The Cloudflare Function at `functions/api/what3words.js` accepts only `grid` and `convert` operations, validates coordinates against the Dolerw feature extent and calls fixed what3words API endpoints. The client also checks point containment against the actual Dolerw polygon before requesting a conversion.
