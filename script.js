@@ -1,15 +1,21 @@
-import { containsPoint, getFeatureBounds } from './modules/geo.js';
-import { getWhat3WordsMapUrl, lookupWhat3Words } from './modules/what3words.js';
+import { containsPoint } from './modules/geo.js';
+import {
+  convertCoordinatesToWhat3Words,
+  fetchGridSection,
+  getWhat3WordsMapUrl
+} from './modules/what3words.js';
 
 const GEOJSON_URL = './open-newtown.geojson';
-const W3W_ENDPOINT = null;
+const WHAT3WORDS_MIN_ZOOM = 18;
 
 const elements = {
   mapStatus: document.querySelector('#map-status'),
+  gridStatus: document.querySelector('#grid-status'),
   selectionStatus: document.querySelector('#selection-status'),
   latitude: document.querySelector('#latitude'),
   longitude: document.querySelector('#longitude'),
   w3wAddress: document.querySelector('#w3w-address'),
+  w3wLoading: document.querySelector('#w3w-loading'),
   findOnW3w: document.querySelector('#find-on-w3w'),
   copyCoordinates: document.querySelector('#copy-coordinates'),
   copyW3w: document.querySelector('#copy-w3w'),
@@ -52,12 +58,20 @@ const selectedLocationIcon = L.divIcon({
 
 let dolerwFeature = null;
 let dolerwLayer = null;
+let parkBounds = null;
 let optionalLayers = {};
 let selectedMarker = null;
+let selectedSquareLayer = null;
 let selectedPoint = null;
 let selectedWhat3Words = null;
 let resetBounds = null;
 let toastTimer = null;
+let gridRefreshTimer = null;
+let gridRequestId = 0;
+let gridRequestController = null;
+let lookupRequestId = 0;
+let lookupRequestController = null;
+let gridLayer = null;
 
 function showToast(message) {
   elements.toast.textContent = message;
@@ -121,28 +135,8 @@ function addOptionalLayers(features) {
   });
 }
 
-function clearSelection() {
-  if (selectedMarker) {
-    map.removeLayer(selectedMarker);
-  }
-  selectedMarker = null;
-  selectedPoint = null;
-  selectedWhat3Words = null;
-
-  elements.latitude.textContent = '--';
-  elements.longitude.textContent = '--';
-  elements.w3wAddress.textContent = 'what3words lookup not configured';
-  elements.selectionStatus.className = 'on-selection-status';
-  elements.selectionStatus.querySelector('span:last-child').textContent = 'No location selected';
-  elements.copyCoordinates.disabled = true;
-  elements.copyW3w.disabled = true;
-  elements.findOnW3w.disabled = true;
-  elements.clearSelection.disabled = true;
-}
-
-async function selectPoint(latlng) {
+function setSelectedPoint(latlng) {
   selectedPoint = latlng;
-  selectedWhat3Words = null;
 
   if (selectedMarker) {
     selectedMarker.setLatLng(latlng);
@@ -163,24 +157,162 @@ async function selectPoint(latlng) {
   elements.copyCoordinates.disabled = false;
   elements.clearSelection.disabled = false;
   elements.findOnW3w.disabled = false;
+}
+
+function clearSelectedSquare() {
+  if (selectedSquareLayer) map.removeLayer(selectedSquareLayer);
+  selectedSquareLayer = null;
+}
+
+function selectPoint(latlng) {
+  if (lookupRequestController) lookupRequestController.abort();
+  lookupRequestId += 1;
+  selectedWhat3Words = null;
+  clearSelectedSquare();
+  setSelectedPoint(latlng);
+  elements.w3wLoading.hidden = true;
   elements.copyW3w.disabled = true;
-  elements.w3wAddress.textContent = W3W_ENDPOINT
-    ? 'Looking up what3words address...'
-    : 'what3words lookup not configured';
+  elements.w3wAddress.textContent = map.getZoom() >= WHAT3WORDS_MIN_ZOOM
+    ? 'Click a what3words square to retrieve its address.'
+    : 'Zoom to level 18 or closer to select a what3words square.';
+}
 
-  if (!W3W_ENDPOINT) return;
+async function selectWhat3WordsSquare(latlng) {
+  if (!dolerwFeature ||
+      !containsPoint(dolerwFeature, latlng.lat, latlng.lng)) {
+    showToast('Please select a square inside the Dolerw boundary');
+    return;
+  }
 
-  const result = await lookupWhat3Words(W3W_ENDPOINT, latlng.lat, latlng.lng);
-  if (!selectedPoint ||
-      selectedPoint.lat !== latlng.lat ||
-      selectedPoint.lng !== latlng.lng) return;
+  if (lookupRequestController) lookupRequestController.abort();
+  lookupRequestController = new AbortController();
+  const requestId = ++lookupRequestId;
+  selectedWhat3Words = null;
+  clearSelectedSquare();
+  setSelectedPoint(latlng);
+  elements.w3wAddress.textContent = '';
+  elements.w3wLoading.hidden = false;
+  elements.copyW3w.disabled = true;
 
-  if (result.ok) {
-    selectedWhat3Words = result.address;
-    elements.w3wAddress.textContent = result.address;
+  try {
+    const result = await convertCoordinatesToWhat3Words(
+      latlng.lat,
+      latlng.lng,
+      lookupRequestController.signal
+    );
+    if (requestId !== lookupRequestId) return;
+
+    selectedWhat3Words = `///${result.words}`;
+    elements.w3wAddress.textContent = selectedWhat3Words;
+    selectedSquareLayer = L.rectangle([
+      [result.square.southwest.lat, result.square.southwest.lng],
+      [result.square.northeast.lat, result.square.northeast.lng]
+    ], {
+      color: '#bd2430',
+      weight: 3,
+      fillColor: '#e83f4b',
+      fillOpacity: 0.3,
+      interactive: false
+    }).addTo(map);
     elements.copyW3w.disabled = false;
-  } else {
-    elements.w3wAddress.textContent = result.message;
+  } catch (error) {
+    if (error.name === 'AbortError' || requestId !== lookupRequestId) return;
+    elements.w3wAddress.textContent = `Lookup failed: ${error.message}`;
+  } finally {
+    if (requestId === lookupRequestId) {
+      elements.w3wLoading.hidden = true;
+    }
+  }
+}
+
+function clearSelection() {
+  if (lookupRequestController) lookupRequestController.abort();
+  lookupRequestId += 1;
+  if (selectedMarker) map.removeLayer(selectedMarker);
+  selectedMarker = null;
+  selectedPoint = null;
+  selectedWhat3Words = null;
+  clearSelectedSquare();
+
+  elements.latitude.textContent = '--';
+  elements.longitude.textContent = '--';
+  elements.w3wAddress.textContent = 'Zoom to level 18 and click a square to select it.';
+  elements.w3wLoading.hidden = true;
+  elements.selectionStatus.className = 'on-selection-status';
+  elements.selectionStatus.querySelector('span:last-child').textContent = 'No location selected';
+  elements.copyCoordinates.disabled = true;
+  elements.copyW3w.disabled = true;
+  elements.findOnW3w.disabled = true;
+  elements.clearSelection.disabled = true;
+}
+
+function setGridStatus(message, isError = false) {
+  elements.gridStatus.textContent = message;
+  elements.gridStatus.hidden = false;
+  elements.gridStatus.setAttribute('role', isError ? 'alert' : 'status');
+}
+
+function removeGridLayer() {
+  if (gridLayer) map.removeLayer(gridLayer);
+  gridLayer = null;
+}
+
+function scheduleGridRefresh() {
+  window.clearTimeout(gridRefreshTimer);
+  gridRefreshTimer = window.setTimeout(updateGridSection, 180);
+}
+
+async function updateGridSection() {
+  if (!dolerwLayer || !parkBounds) return;
+  if (gridRequestController) gridRequestController.abort();
+  const requestId = ++gridRequestId;
+
+  if (map.getZoom() < WHAT3WORDS_MIN_ZOOM) {
+    removeGridLayer();
+    setGridStatus('Zoom to level 18 or closer to display the what3words grid.');
+    return;
+  }
+
+  const visibleBounds = map.getBounds();
+  const south = Math.max(visibleBounds.getSouth(), parkBounds.getSouth());
+  const west = Math.max(visibleBounds.getWest(), parkBounds.getWest());
+  const north = Math.min(visibleBounds.getNorth(), parkBounds.getNorth());
+  const east = Math.min(visibleBounds.getEast(), parkBounds.getEast());
+  if (south >= north || west >= east) {
+    removeGridLayer();
+    setGridStatus('The visible map area does not overlap Dolerw Park.');
+    return;
+  }
+
+  const bounds = L.latLngBounds([south, west], [north, east]);
+  gridRequestController = new AbortController();
+  removeGridLayer();
+  setGridStatus('Loading what3words grid for the visible park area...');
+
+  try {
+    const data = await fetchGridSection(bounds, gridRequestController.signal);
+    if (requestId !== gridRequestId) return;
+
+    gridLayer = L.geoJSON(data, {
+      style: {
+        color: '#245b7a',
+        weight: 0.7,
+        opacity: 0.8,
+        fillColor: '#75b9df',
+        fillOpacity: 0.025
+      },
+      bubblingMouseEvents: false,
+      onEachFeature(feature, layer) {
+        layer.on('click', (event) => {
+          if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
+          selectWhat3WordsSquare(event.latlng);
+        });
+      }
+    }).addTo(map);
+    setGridStatus('what3words grid loaded. Click a square inside the park to select it.');
+  } catch (error) {
+    if (error.name === 'AbortError' || requestId !== gridRequestId) return;
+    setGridStatus(`Unable to load what3words grid: ${error.message}`, true);
   }
 }
 
@@ -212,6 +344,7 @@ async function loadGeoJson() {
       style: styleFeature('Dolerw')
     }).addTo(map);
     resetBounds = dolerwLayer.getBounds();
+    parkBounds = resetBounds;
     map.fitBounds(resetBounds, { padding: [20, 20] });
 
     addOptionalLayers(namedFeatures);
@@ -225,12 +358,15 @@ async function loadGeoJson() {
       status += ` Boundary ambiguity: "Park Grounds" is a separate named polygon and Dolerw is used as the exact boundary.`;
     }
     elements.mapStatus.textContent = status;
+    scheduleGridRefresh();
 
   } catch (error) {
     elements.mapStatus.textContent = `Data error: ${error.message}`;
     elements.mapStatus.setAttribute('role', 'alert');
   }
 }
+
+map.on('moveend zoomend', scheduleGridRefresh);
 
 map.on('click', (event) => {
   if (!dolerwFeature) {

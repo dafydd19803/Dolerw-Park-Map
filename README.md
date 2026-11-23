@@ -43,7 +43,7 @@ Empty and invalid features are ignored and reported. The UI will show an error i
 
 ## Location selection
 
-Click inside the blue Dolerw boundary to place or update the marker. Latitude and longitude are shown to six decimal places. The copy and clear buttons operate on the current selection.
+Click inside the blue Dolerw boundary to place or update the marker. Latitude and longitude are shown to six decimal places. At zoom level 18 or higher, the what3words grid loads for the visible part of Dolerw Park. Click a square to look up its official address; the returned square bounds are highlighted. The copy and clear buttons operate on the current selection.
 
 The GeoJSON polygon ring check also includes hole handling for future Polygon data.
 
@@ -51,11 +51,34 @@ Use the map's layer selector to switch between OpenStreetMap and Esri satellite 
 
 ## what3words
 
-The prototype does not request or invent what3words addresses. It shows `what3words lookup not configured`.
+The grid-section and convert-to-3wa calls use the official what3words API through a same-origin Cloudflare Pages Function. The browser never receives the API key. Grid requests are only made at zoom 18 or higher and are clipped to the current viewport and the Dolerw feature's bounding extent. The server validates both operations and enforces the API's 4 km grid-section request limit.
 
-After selecting a point, **Find on what3words** opens the official map in a new tab and copies the selected six-decimal coordinates to the clipboard. Paste them into what3words' search field to find that location. Testing showed coordinate-only map URLs display the same default three-word label for different coordinates instead of resolving a precise address. The official coordinates-to-three-word conversion API requires an API key, so the prototype does not place coordinates in a URL that could show an unrelated address, calculate addresses, or display unverified results.
+**Find on what3words** opens the official map in a new tab and copies the selected six-decimal coordinates to the clipboard. **Copy what3words** copies the official address returned by the API after a square is selected.
 
-Future integration belongs in `modules/what3words.js`. Set `W3W_ENDPOINT` in `script.js` to a secure WordPress REST endpoint. The endpoint should accept `lat` and `lng`, call the official what3words API from the server, and return JSON containing an `address` property. API credentials must remain in WordPress server configuration.
+## Local API testing
+
+The Cloudflare Pages Function is required for real what3words calls. Install Node.js, then create a `.dev.vars` file in the project root (this filename is ignored by Git):
+
+```text
+W3W_API_KEY=your_what3words_api_key
+```
+
+Run the app and function locally with Wrangler:
+
+```powershell
+npx wrangler pages dev . --port 8788
+```
+
+Open `http://localhost:8788/`, zoom to 18 or higher, wait for the grid, then select a square. Do not use a static file server for API tests; it will not execute Pages Functions. Never put the key in `script.js`, HTML, or a committed file.
+
+## Cloudflare Pages setup
+
+1. Deploy this project folder as a Cloudflare Pages project using its Git integration or `npx wrangler pages deploy . --project-name=<project-name>`. Keep the `functions/` directory at the project root.
+2. In the Cloudflare dashboard, open the Pages project **Settings → Variables and Secrets** and add `W3W_API_KEY` as a **Secret** for Production. Add it separately for Preview if preview deployments need API access.
+3. Alternatively, add the secret with Wrangler: `npx wrangler pages secret put W3W_API_KEY --project-name=<project-name>`.
+4. Redeploy after setting or rotating the secret. The function returns an explicit configuration error if the secret is missing.
+
+The Cloudflare Function at `functions/api/what3words.js` accepts only `grid` and `convert` operations, validates coordinates against the Dolerw feature extent and calls fixed what3words API endpoints. The client also checks point containment against the actual Dolerw polygon before requesting a conversion.
 
 Check the current what3words API terms and pricing before enabling paid lookups.
 
@@ -76,7 +99,7 @@ Do not modify the live Open Newtown website or WordPress installation during sta
 
 ## Known limitations
 
-- what3words is not connected.
+- Live what3words requests require a configured API key and network access to the what3words API.
 - No event, booking or administration features are implemented.
 - Map data and optional layers depend on the supplied static GeoJSON.
 - Geographic feature names must be available in their `properties.name` field.

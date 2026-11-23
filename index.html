@@ -32,8 +32,11 @@
         </div>
         <button id="reset-view" class="on-button on-button--secondary" type="button">Reset map view</button>
       </div>
-      <p class="on-map-instruction">Click inside the blue Dolerw Park boundary to select a location. Click another spot to move the marker.</p>
+      <p class="on-map-instruction">Click inside the blue Dolerw Park boundary to select a location. Zoom to level 18 or higher to select a what3words square.</p>
       <div id="map" role="application" aria-label="Map of Dolerw Park"></div>
+      <p id="grid-status" class="on-map-status" role="status" aria-live="polite">
+        Zoom to level 18 or closer to display the what3words grid.
+      </p>
       <p id="map-status" class="on-map-status" role="status" aria-live="polite">Loading geographic data...</p>
     </section>
 
@@ -57,8 +60,12 @@
 
       <section class="on-w3w" aria-labelledby="w3w-heading">
         <h3 id="w3w-heading">what3words</h3>
-        <p id="w3w-address" class="on-w3w__address">what3words lookup not configured</p>
-        <p class="on-w3w__help">The official map does not resolve coordinates from its URL. This opens the map and copies the selected coordinates for its search field.</p>
+        <p id="w3w-address" class="on-w3w__address">Zoom to level 18 and click a square to select it.</p>
+        <p id="w3w-loading" class="on-w3w__loading" role="status" aria-live="polite" hidden>
+          <span class="on-spinner" aria-hidden="true"></span>
+          Looking up what3words address...
+        </p>
+        <p class="on-w3w__help">At zoom 18 or higher, click a grid square to retrieve its official address.</p>
         <button id="find-on-w3w" class="on-button" type="button" disabled>
           Find on what3words
         </button>

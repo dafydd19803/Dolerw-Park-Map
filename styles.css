@@ -193,6 +193,29 @@ body {
 .on-w3w h3 { margin: 0 0 8px; font-size: 0.9rem; }
 .on-w3w__address { min-height: 38px; color: var(--on-muted); font-size: 0.82rem; }
 .on-w3w__help { color: var(--on-muted); font-size: 0.78rem; line-height: 1.45; }
+.on-w3w__loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--on-blue);
+  font-size: 0.82rem;
+}
+
+.on-w3w__loading[hidden] { display: none; }
+
+.on-spinner {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border: 2px solid #c8ddeb;
+  border-top-color: var(--on-blue);
+  border-radius: 50%;
+  animation: on-spin 700ms linear infinite;
+}
+
+@keyframes on-spin {
+  to { transform: rotate(360deg); }
+}
 
 .on-actions {
   display: grid;
@@ -315,4 +338,5 @@ button.leaflet-control-zoom-out:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   .on-toast { transition: none; }
+  .on-spinner { animation: none; }
 }
